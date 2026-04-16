@@ -77,10 +77,16 @@ class AuthController extends Controller
 
         $tokens  = $response->json();
         $payload = $this->parseJwt($tokens['access_token']);
-        $groups  = $payload['groups'] ?? [];
+
+        $realmRoles    = $payload['realm_access']['roles'] ?? [];
+        $resourceRoles = [];
+        foreach ($payload['resource_access'] ?? [] as $client) {
+            $resourceRoles = array_merge($resourceRoles, $client['roles'] ?? []);
+        }
+        $allRoles = array_merge($realmRoles, $resourceRoles);
 
         $allowed = config('keycloak.allowed_groups');
-        if (empty(array_intersect($groups, $allowed))) {
+        if (empty(array_intersect($allRoles, $allowed))) {
             return redirect()->route('login.contact');
         }
 
