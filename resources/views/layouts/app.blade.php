@@ -19,6 +19,9 @@
         </li>
       </ul>
       <ul class="navbar-nav ms-auto">
+        <li class="nav-item d-flex align-items-center me-3">
+          <small class="text-muted" id="session-timer-wrap" style="display:none">Automatic logout in: <span id="session-timer" class="fw-bold">--:--</span></small>
+        </li>
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
             <i class="bi bi-person-circle me-1"></i>{{ session('user_name') }}
@@ -81,5 +84,75 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0-rc2/dist/js/adminlte.min.js"></script>
+<script>
+(function () {
+    const INACTIVITY_LIMIT = 5 * 60;
+    let expiresAt = {{ session('token_expires_at', 0) }};
+    let lastActivity = Math.floor(Date.now() / 1000);
+    const timerEl = document.getElementById('session-timer');
+    const timerWrap = document.getElementById('session-timer-wrap');
+    const checkUrl = '{{ route('session.check') }}';
+    const loginUrl = '{{ route('login') }}';
+
+    ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'].forEach(function (e) {
+        document.addEventListener(e, function () { lastActivity = Math.floor(Date.now() / 1000); }, { passive: true });
+    });
+
+    function inactiveSeconds() {
+        return Math.floor(Date.now() / 1000) - lastActivity;
+    }
+
+    let refreshing = false;
+    function updateDisplay() {
+        const idleSeconds = inactiveSeconds();
+        const remaining = INACTIVITY_LIMIT - idleSeconds;
+        if (idleSeconds >= INACTIVITY_LIMIT) {
+            timerWrap.style.display = '';
+            timerEl.textContent = '00:00';
+            timerEl.classList.add('text-danger');
+            if (!refreshing) { refreshing = true; doLogout(); }
+            return;
+        }
+        if (remaining <= 60) {
+            timerWrap.style.display = '';
+            const m = String(Math.floor(remaining / 60)).padStart(2, '0');
+            const s = String(remaining % 60).padStart(2, '0');
+            timerEl.textContent = m + ':' + s;
+            timerEl.classList.toggle('text-warning', remaining <= 60);
+            timerEl.classList.toggle('text-danger', remaining <= 30);
+        } else {
+            timerWrap.style.display = 'none';
+        }
+    }
+
+    async function refresh() {
+        if (inactiveSeconds() >= INACTIVITY_LIMIT) { doLogout(); return; }
+        try {
+            const res = await fetch(checkUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data = await res.json();
+            if (!data.valid) { window.location.href = loginUrl; return; }
+            expiresAt = data.expires_at;
+            refreshing = false;
+        } catch (e) {
+            window.location.href = loginUrl;
+        }
+    }
+
+    function doLogout() {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ route('logout') }}';
+        const csrf = document.createElement('input');
+        csrf.type = 'hidden'; csrf.name = '_token'; csrf.value = '{{ csrf_token() }}';
+        form.appendChild(csrf);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    updateDisplay();
+    setInterval(updateDisplay, 1000);
+    setInterval(refresh, 30000);
+})();
+</script>
 </body>
 </html>

@@ -14,6 +14,7 @@ Route::post('/login', [AuthController::class, 'lookupRealm'])->name('login.submi
 Route::get('/login/contact', fn() => view('auth.contact'))->name('login.contact');
 Route::get('/auth/callback', [AuthController::class, 'callback'])->name('auth.callback');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::get('/session-check', [AuthController::class, 'sessionCheck'])->name('session.check')->middleware(RequireAuth::class);
 
 // Protected
 Route::middleware(RequireAuth::class)->group(function () {

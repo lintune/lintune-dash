@@ -97,6 +97,7 @@ class AuthController extends Controller
             'user_name'     => $payload['name'] ?? $payload['preferred_username'] ?? '',
             'user_email'    => $payload['email'] ?? '',
             'realm'         => $realm,
+            'token_expires_at' => now()->addSeconds($tokens['expires_in'])->timestamp,
         ]);
 
         return redirect()->route('dashboard');
@@ -116,6 +117,37 @@ class AuthController extends Controller
         ]);
 
         return redirect("{$base}/realms/{$realm}/protocol/openid-connect/logout?{$params}");
+    }
+
+    public function sessionCheck()
+    {
+        $refreshToken = session('refresh_token');
+        $realm        = session('realm');
+
+        if (!$refreshToken || !$realm) {
+            return response()->json(['valid' => false]);
+        }
+
+        $base     = config('keycloak.base_url');
+        $response = \Http::asForm()->post("{$base}/realms/{$realm}/protocol/openid-connect/token", [
+            'grant_type'    => 'refresh_token',
+            'client_id'     => config('keycloak.client_id'),
+            'refresh_token' => $refreshToken,
+        ]);
+
+        if ($response->failed()) {
+            session()->flush();
+            return response()->json(['valid' => false]);
+        }
+
+        $tokens = $response->json();
+        session([
+            'access_token'     => $tokens['access_token'],
+            'refresh_token'    => $tokens['refresh_token'],
+            'token_expires_at' => now()->addSeconds($tokens['expires_in'])->timestamp,
+        ]);
+
+        return response()->json(['valid' => true, 'expires_at' => session('token_expires_at')]);
     }
 
     private function generateVerifier(): string
