@@ -17,7 +17,7 @@ class UserController extends Controller
 
     private function realmAdminRoleId(string $base, string $realm, string $token): ?array
     {
-        $clients   = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/clients")->json();
+        $clients    = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/clients")->json();
         $mgmtClient = collect($clients)->firstWhere('clientId', 'realm-management');
 
         if (!$mgmtClient) return null;
@@ -27,6 +27,24 @@ class UserController extends Controller
         $role   = collect($roles)->firstWhere('name', 'realm-admin');
 
         return $role ? ['mgmtId' => $mgmtId, 'role' => $role] : null;
+    }
+
+    private function adminUserIds(string $base, string $realm, string $token): array
+    {
+        $realmAdmin = $this->realmAdminRoleId($base, $realm, $token);
+        if (!$realmAdmin) return [];
+
+        $users = \Http::withToken($token)
+            ->get("{$base}/admin/realms/{$realm}/clients/{$realmAdmin['mgmtId']}/roles/realm-admin/users")
+            ->json();
+
+        return collect($users)->pluck('id')->toArray();
+    }
+
+    private function isLastAdmin(string $userId, string $base, string $realm, string $token): bool
+    {
+        $ids = $this->adminUserIds($base, $realm, $token);
+        return count($ids) === 1 && in_array($userId, $ids);
     }
 
     public function index()
@@ -133,11 +151,17 @@ class UserController extends Controller
         // Sync realm-admin role
         $realmAdmin = $this->realmAdminRoleId($base, $realm, $token);
         if ($realmAdmin) {
-            $mgmtId = $realmAdmin['mgmtId'];
-            $role   = $realmAdmin['role'];
-            $url    = "{$base}/admin/realms/{$realm}/users/{$userId}/role-mappings/clients/{$mgmtId}";
+            $mgmtId  = $realmAdmin['mgmtId'];
+            $role    = $realmAdmin['role'];
+            $url     = "{$base}/admin/realms/{$realm}/users/{$userId}/role-mappings/clients/{$mgmtId}";
+            $makeAdmin = $request->boolean('is_admin');
 
-            if ($request->boolean('is_admin')) {
+            // Prevent removing the last realm admin
+            if (!$makeAdmin && $this->isLastAdmin($userId, $base, $realm, $token)) {
+                return redirect()->route('users')->withErrors(['user' => 'Cannot remove the realm-admin role from the last admin.']);
+            }
+
+            if ($makeAdmin) {
                 \Http::withToken($token)->post($url, [$role]);
             } else {
                 \Http::withToken($token)->delete($url, [$role]);
@@ -154,6 +178,11 @@ class UserController extends Controller
         $user    = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/users/{$userId}")->json();
         $enabled = !($user['enabled'] ?? false);
 
+        // Prevent disabling the last realm admin
+        if (!$enabled && $this->isLastAdmin($userId, $base, $realm, $token)) {
+            return redirect()->route('users')->withErrors(['user' => 'Cannot disable the last realm admin.']);
+        }
+
         \Http::withToken($token)->put("{$base}/admin/realms/{$realm}/users/{$userId}", ['enabled' => $enabled]);
 
         return redirect()->route('users')->with('success', 'User ' . ($enabled ? 'enabled' : 'disabled') . '.');
@@ -162,6 +191,10 @@ class UserController extends Controller
     public function destroy(string $userId)
     {
         ['base' => $base, 'realm' => $realm, 'token' => $token] = $this->keycloak();
+
+        if ($this->isLastAdmin($userId, $base, $realm, $token)) {
+            return redirect()->route('users')->withErrors(['user' => 'Cannot delete the last realm admin.']);
+        }
 
         $res = \Http::withToken($token)->delete("{$base}/admin/realms/{$realm}/users/{$userId}");
 
