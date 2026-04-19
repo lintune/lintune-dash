@@ -206,6 +206,10 @@ class UserController extends Controller
 
         $mailcowUrl = rtrim(config('mailcow.url'), '/');
         $headers    = ['X-API-Key' => config('mailcow.api_key'), 'Accept' => 'application/json'];
+
+        if (!$mailcowUrl || !config('mailcow.api_key')) {
+            return back()->withErrors(['user' => 'Mailcow is not configured on this server.']);
+        }
         $mailbox    = Mailbox::where('email', $email)->first();
 
         if ($mailbox) {
