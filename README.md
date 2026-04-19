@@ -1,74 +1,54 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Lintune Dash
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Lintune Dash is the tenant-facing portal for the Lintune platform — an open-source alternative to Microsoft Azure AD / Entra ID, Exchange, and OneDrive, built on open-source components.
 
-## About Laravel
+| Component | Role |
+|---|---|
+| [Keycloak](https://www.keycloak.org/) | Identity provider — realms, users, SSO |
+| [Mailcow](https://mailcow.email/) | Email server — domains, mailboxes |
+| Nextcloud *(planned)* | File storage & collaboration |
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+This repo is the **tenant admin portal**. It is what customers use to manage their own organisation.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## What it does
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Authenticates tenant admins via **Keycloak OIDC** (PKCE), scoped to their own realm — determined by their email domain
+- Allows tenant admins to **manage users** in their Keycloak realm (create, update, enable/disable, delete)
+- Allows tenant admins to **manage mailboxes** in Mailcow per user (enable/disable)
+- Nextcloud user management *(planned)*
 
-## Learning Laravel
+## How it fits in the platform
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+[ Tenant Admin ]
+      |
+      | logs in via their domain (e.g. company.com)
+      v
+[ lintune-dash ] ──► MySQL (domain_realm_map lookup → finds their Keycloak realm)
+                 ──► Keycloak OIDC (authenticates against tenant realm)
+                 ──► Keycloak Admin API (manage users in tenant realm)
+                 ──► Mailcow API (manage mailboxes)
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+The login flow works as follows:
+1. Tenant admin enters their email address
+2. lintune-dash looks up the domain in `domain_realm_map` to find the correct Keycloak realm
+3. The user is redirected to Keycloak for authentication (PKCE)
+4. On callback, the session is established and the admin lands on their dashboard
 
-## Contributing
+> The database and `domain_realm_map` table are provisioned and managed by [lintune-admin](../lintune-admin). Do not run migrations in this repo.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## How it relates to lintune-admin
 
-## Code of Conduct
+| Concern | lintune-admin | lintune-dash |
+|---|---|---|
+| Audience | Platform operators | Tenant admins |
+| Realm provisioning | ✅ | ❌ |
+| User management | Initial admin only | Full CRUD within own realm |
+| Mailcow domain setup | ✅ | ❌ |
+| Mailbox management per user | ❌ | ✅ |
+| Database migrations | ✅ | ❌ |
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Installation
 
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-
-## Keycloak Proxy Configuration
-
-Keycloak must be explicitly told it is behind a proxy and what its public hostname is to ensure it generates correct redirect URLs and trusts the incoming traffic headers. Update your `keycloak.conf` file:
-
-- **`proxy-headers`**: Set to `xforwarded` so Keycloak respects the `X-Forwarded-*` headers from Cloudflare.
-- **`hostname`**: Set this to your public domain (e.g., `keycloak.yourdomain.com`).
-- **`http-enabled`**: Set to `true`. This allows the local cloudflared agent to talk to Keycloak over unencrypted HTTP, while Cloudflare handles the public HTTPS encryption.
-
-Example:
-
-```properties
-proxy-headers=xforwarded
-hostname=keycloak.yourdomain.com
-http-enabled=true
-```
+See [docs/install.md](docs/install.md).
