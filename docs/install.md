@@ -4,7 +4,7 @@
 
 - PHP 8.3+
 - Composer
-- Node.js & npm
+- Node.js
 - MySQL database (shared with lintune-admin)
 - Keycloak instance
 - Mailcow instance (optional)
@@ -17,7 +17,6 @@
 git clone <repo-url> lintune-dash
 cd lintune-dash
 composer install --no-dev --optimize-autoloader
-npm install
 ```
 
 ### 2. Configure environment
@@ -42,20 +41,14 @@ Edit `.env` and fill in the required values:
 
 > **Note:** Database migrations are managed by lintune-admin. Do not run migrations here.
 
-### 3. Build frontend assets
-
-```bash
-npm run build
-```
-
-### 4. Set storage permissions
+### 3. Set storage permissions
 
 ```bash
 chmod -R 775 storage bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
 ```
 
-### 5. Optimize for production
+### 4. Optimize for production
 
 ```bash
 php artisan config:cache
