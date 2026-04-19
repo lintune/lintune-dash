@@ -21,7 +21,6 @@ class AuthController extends Controller
         $request->validate(['email' => 'required|email']);
 
         $domain = Str::after($request->email, '@');
-        // amazonq-ignore-next-line
         $map = DomainRealmMap::where('domain', $domain)->first();
 
         if (!$map) {
