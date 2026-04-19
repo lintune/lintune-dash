@@ -19,4 +19,8 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware(RequireAuth::class)->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/users', [UserController::class, 'index'])->name('users');
+    Route::post('/users', [UserController::class, 'store'])->name('users.store');
+    Route::put('/users/{userId}', [UserController::class, 'update'])->name('users.update');
+    Route::post('/users/{userId}/toggle', [UserController::class, 'toggle'])->name('users.toggle');
+    Route::delete('/users/{userId}', [UserController::class, 'destroy'])->name('users.destroy');
 });
