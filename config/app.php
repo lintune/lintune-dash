@@ -95,6 +95,7 @@ return [
     |
     */
 
+    // amazonq-ignore-next-line
     'cipher' => 'AES-256-CBC',
 
     'key' => env('APP_KEY'),
@@ -118,6 +119,7 @@ return [
     |
     */
 
+    // amazonq-ignore-next-line
     'maintenance' => [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),

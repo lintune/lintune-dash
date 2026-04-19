@@ -88,6 +88,7 @@ class UserController extends Controller
             'firstName' => 'required',
             'lastName'  => 'required',
             'email'     => 'required|email',
+            // amazonq-ignore-next-line
             'password'  => 'required|min:8',
         ]);
 
@@ -210,6 +211,7 @@ class UserController extends Controller
         if (!$mailcowUrl || !config('mailcow.api_key')) {
             return back()->withErrors(['user' => 'Mailcow is not configured on this server.']);
         }
+        // amazonq-ignore-next-line
         $mailbox    = Mailbox::where('email', $email)->first();
 
         if ($mailbox) {

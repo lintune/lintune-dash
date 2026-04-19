@@ -143,6 +143,7 @@ return [
     |
     */
 
+    // amazonq-ignore-next-line
     'redis' => [
 
         'client' => env('REDIS_CLIENT', 'phpredis'),

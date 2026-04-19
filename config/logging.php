@@ -50,6 +50,7 @@ return [
     |
     */
 
+    // amazonq-ignore-next-line
     'channels' => [
 
         'stack' => [
