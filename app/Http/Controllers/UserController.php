@@ -133,7 +133,6 @@ class UserController extends Controller
             'firstName' => $request->firstName,
             'lastName'  => $request->lastName,
             'email'     => $request->email,
-            'username'  => $request->email,
         ]);
 
         if ($res->failed()) {

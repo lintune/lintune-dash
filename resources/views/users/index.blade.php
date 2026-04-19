@@ -61,6 +61,7 @@
                 data-firstname="{{ $user['firstName'] ?? '' }}"
                 data-lastname="{{ $user['lastName'] ?? '' }}"
                 data-email="{{ $user['email'] ?? '' }}"
+                data-username="{{ $user['username'] ?? '' }}"
                 data-admin="{{ $isAdmin ? '1' : '0' }}">
                 <i class="bi bi-pencil"></i>
               </button>
@@ -113,6 +114,12 @@
           <div class="mb-3">
             <label class="form-label">Email</label>
             <input type="email" name="email" id="fieldEmail" class="form-control" required />
+            <small class="text-muted" id="emailHint"></small>
+          </div>
+          <div class="mb-3" id="usernameRow" style="display:none">
+            <label class="form-label">Username</label>
+            <input type="text" id="fieldUsername" class="form-control" readonly />
+            <small class="text-muted">Username cannot be changed.</small>
           </div>
           <div class="mb-3">
             <label class="form-label" id="passwordLabel">Password</label>
@@ -193,6 +200,7 @@ document.getElementById('userModal').addEventListener('show.bs.modal', function 
   document.getElementById('fieldFirstName').value = '';
   document.getElementById('fieldLastName').value  = '';
   document.getElementById('fieldEmail').value     = '';
+  document.getElementById('fieldUsername').value  = '';
   pwdField.value = '';
   document.getElementById('fieldIsAdmin').checked = false;
 
@@ -202,8 +210,9 @@ document.getElementById('userModal').addEventListener('show.bs.modal', function 
     this.querySelector('.modal-title').textContent = 'New User';
     pwdField.required = true;
     hint.textContent  = 'Required.';
+    document.getElementById('emailHint').textContent = 'This will also be the username and cannot be changed later.';
+    document.getElementById('usernameRow').style.display = 'none';
     document.getElementById('userSubmitBtn').textContent = 'Create User';
-    // Auto-generate on open
     pwdField.value = generatePassword();
   } else {
     const id = btn.dataset.id;
@@ -213,7 +222,10 @@ document.getElementById('userModal').addEventListener('show.bs.modal', function 
     document.getElementById('fieldFirstName').value = btn.dataset.firstname;
     document.getElementById('fieldLastName').value  = btn.dataset.lastname;
     document.getElementById('fieldEmail').value     = btn.dataset.email;
+    document.getElementById('fieldUsername').value  = btn.dataset.username;
     document.getElementById('fieldIsAdmin').checked = btn.dataset.admin === '1';
+    document.getElementById('emailHint').textContent = '';
+    document.getElementById('usernameRow').style.display = '';
     pwdField.required = false;
     hint.textContent  = 'Leave blank to keep current password.';
     document.getElementById('userSubmitBtn').textContent = 'Save Changes';
