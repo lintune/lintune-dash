@@ -23,5 +23,6 @@ Route::middleware(RequireAuth::class)->group(function () {
     Route::post('/users', [UserController::class, 'store'])->name('users.store');
     Route::put('/users/{userId}', [UserController::class, 'update'])->name('users.update');
     Route::post('/users/{userId}/toggle', [UserController::class, 'toggle'])->name('users.toggle');
+    Route::post('/users/{userId}/toggle-mailbox', [UserController::class, 'toggleMailbox'])->name('users.toggle-mailbox');
     Route::delete('/users/{userId}', [UserController::class, 'destroy'])->name('users.destroy');
 });

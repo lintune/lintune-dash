@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Mailbox;
+use App\Models\DomainRealmMap;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
@@ -56,24 +59,27 @@ class UserController extends Controller
                 ->get("{$base}/admin/realms/{$realm}/users", ['max' => 1000])
                 ->json();
 
-            // Fetch realm-admin role assignments to flag admins
             $realmAdmin = $this->realmAdminRoleId($base, $realm, $token);
             $adminUserIds = [];
 
             if ($realmAdmin) {
-                $mgmtId = $realmAdmin['mgmtId'];
-                $roleId = $realmAdmin['role']['id'];
+                $mgmtId     = $realmAdmin['mgmtId'];
                 $adminUsers = \Http::withToken($token)
                     ->get("{$base}/admin/realms/{$realm}/clients/{$mgmtId}/roles/realm-admin/users")
                     ->json();
                 $adminUserIds = collect($adminUsers)->pluck('id')->toArray();
             }
         } catch (\Throwable) {
-            $users = null;
+            $users        = null;
             $adminUserIds = [];
         }
 
-        return view('users.index', compact('users', 'adminUserIds'));
+        $mailcowEnabled = DomainRealmMap::where('realm', $realm)->value('mailcow_enabled') ?? false;
+        $mailboxEmails  = $mailcowEnabled
+            ? Mailbox::where('realm', $realm)->pluck('active', 'email')
+            : collect();
+
+        return view('users.index', compact('users', 'adminUserIds', 'mailcowEnabled', 'mailboxEmails'));
     }
 
     public function store(Request $request)
@@ -185,6 +191,52 @@ class UserController extends Controller
         \Http::withToken($token)->put("{$base}/admin/realms/{$realm}/users/{$userId}", ['enabled' => $enabled]);
 
         return redirect()->route('users')->with('success', 'User ' . ($enabled ? 'enabled' : 'disabled') . '.');
+    }
+
+    public function toggleMailbox(string $userId)
+    {
+        ['base' => $base, 'realm' => $realm, 'token' => $token] = $this->keycloak();
+
+        $user  = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/users/{$userId}")->json();
+        $email = $user['email'] ?? null;
+
+        if (!$email) {
+            return back()->withErrors(['user' => 'User has no email address.']);
+        }
+
+        $mailcowUrl = rtrim(config('mailcow.url'), '/');
+        $headers    = ['X-API-Key' => config('mailcow.api_key'), 'Accept' => 'application/json'];
+        $mailbox    = Mailbox::where('email', $email)->first();
+
+        if ($mailbox) {
+            // Delete mailbox from Mailcow
+            $res = \Http::withHeaders($headers)->post("{$mailcowUrl}/api/v1/delete/mailbox", [$email]);
+            if ($res->failed() || ($res->json()[0]['type'] ?? '') === 'error') {
+                $detail = $res->json()[0]['msg'] ?? $res->body();
+                return back()->withErrors(['user' => "Failed to delete mailbox: {$detail}"]);
+            }
+            $mailbox->delete();
+            return redirect()->route('users')->with('success', "Mailbox {$email} deleted.");
+        }
+
+        // Create mailbox in Mailcow
+        $password = bin2hex(random_bytes(12));
+        $res = \Http::withHeaders($headers)->post("{$mailcowUrl}/api/v1/add/mailbox", [
+            'local_part'  => Str::before($email, '@'),
+            'domain'      => Str::after($email, '@'),
+            'name'        => trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')),
+            'password'    => $password,
+            'password2'   => $password,
+            'active'      => '1',
+        ]);
+
+        if ($res->failed() || ($res->json()[0]['type'] ?? '') === 'error') {
+            $detail = $res->json()[0]['msg'] ?? $res->body();
+            return back()->withErrors(['user' => "Failed to create mailbox: {$detail}"]);
+        }
+
+        Mailbox::create(['email' => $email, 'realm' => $realm, 'active' => true]);
+        return redirect()->route('users')->with('success', "Mailbox {$email} created.");
     }
 
     public function destroy(string $userId)

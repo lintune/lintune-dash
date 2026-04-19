@@ -32,15 +32,21 @@
             <th>Email</th>
             <th>Role</th>
             <th>Status</th>
+            @if($mailcowEnabled)<th>Mailbox</th>@endif
             <th></th>
           </tr>
         </thead>
         <tbody>
           @foreach ($users as $user)
-          @php $enabled = $user['enabled'] ?? false; $isAdmin = in_array($user['id'], $adminUserIds); @endphp
+          @php
+            $enabled = $user['enabled'] ?? false;
+            $isAdmin = in_array($user['id'], $adminUserIds);
+            $userEmail = $user['email'] ?? '';
+            $hasMailbox = $mailcowEnabled && isset($mailboxEmails[$userEmail]);
+          @endphp
           <tr>
             <td>{{ trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')) ?: '–' }}</td>
-            <td>{{ $user['email'] ?? '–' }}</td>
+            <td>{{ $userEmail ?: '–' }}</td>
             <td>
               @if ($isAdmin)
                 <span class="badge text-bg-dark"><i class="bi bi-shield-check me-1"></i>Realm Admin</span>
@@ -53,6 +59,13 @@
                 {{ $enabled ? 'Active' : 'Disabled' }}
               </span>
             </td>
+            @if($mailcowEnabled)
+            <td>
+              <span class="badge text-bg-{{ $hasMailbox ? 'success' : 'secondary' }}">
+                <i class="bi bi-envelope{{ $hasMailbox ? '-check' : '' }} me-1"></i>{{ $hasMailbox ? 'Active' : 'None' }}
+              </span>
+            </td>
+            @endif
             <td class="text-end pe-3">
               <button type="button" class="btn btn-sm btn-outline-secondary me-1"
                 data-bs-toggle="modal" data-bs-target="#userModal"
@@ -65,6 +78,15 @@
                 data-admin="{{ $isAdmin ? '1' : '0' }}">
                 <i class="bi bi-pencil"></i>
               </button>
+              @if($mailcowEnabled)
+              <form method="POST" action="{{ route('users.toggle-mailbox', $user['id']) }}" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-sm {{ $hasMailbox ? 'btn-outline-danger' : 'btn-outline-primary' }} me-1"
+                  title="{{ $hasMailbox ? 'Delete mailbox' : 'Create mailbox' }}">
+                  <i class="bi bi-envelope{{ $hasMailbox ? '-dash' : '-plus' }}"></i>
+                </button>
+              </form>
+              @endif
               <button type="button" class="btn btn-sm {{ $enabled ? 'btn-warning' : 'btn-success' }} me-1"
                 data-bs-toggle="modal" data-bs-target="#confirmModal"
                 data-action="toggle"
