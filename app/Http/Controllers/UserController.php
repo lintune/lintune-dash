@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Mailbox;
 use App\Models\DomainRealmMap;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -122,6 +123,7 @@ class UserController extends Controller
             }
         }
 
+        AuditLogger::log('user.created', $request->email);
         return redirect()->route('users')->with('success', 'User created.');
     }
 
@@ -173,6 +175,7 @@ class UserController extends Controller
             }
         }
 
+        AuditLogger::log('user.updated', $request->email);
         return redirect()->route('users')->with('success', 'User updated.');
     }
 
@@ -190,7 +193,9 @@ class UserController extends Controller
 
         \Http::withToken($token)->put("{$base}/admin/realms/{$realm}/users/{$userId}", ['enabled' => $enabled]);
 
-        return redirect()->route('users')->with('success', 'User ' . ($enabled ? 'enabled' : 'disabled') . '.');
+        $status = $enabled ? 'enabled' : 'disabled';
+        AuditLogger::log("user.{$status}", $user['email'] ?? $userId);
+        return redirect()->route('users')->with('success', 'User ' . $status . '.');
     }
 
     public function toggleMailbox(string $userId)
@@ -220,6 +225,7 @@ class UserController extends Controller
                 return back()->withErrors(['user' => "Failed to delete mailbox: {$detail}"]);
             }
             $mailbox->delete();
+            AuditLogger::log('mailbox.deleted', $email);
             return redirect()->route('users')->with('success', "Mailbox {$email} deleted.");
         }
 
@@ -240,6 +246,7 @@ class UserController extends Controller
         }
 
         Mailbox::create(['email' => $email, 'realm' => $realm, 'active' => true]);
+        AuditLogger::log('mailbox.created', $email);
         return redirect()->route('users')->with('success', "Mailbox {$email} created.");
     }
 
@@ -257,6 +264,7 @@ class UserController extends Controller
             return back()->withErrors(['user' => 'Failed to delete user.']);
         }
 
+        AuditLogger::log('user.deleted', $userId);
         return redirect()->route('users')->with('success', 'User deleted.');
     }
 }

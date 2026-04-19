@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
@@ -39,4 +40,6 @@ Route::middleware(RequireAuth::class)->group(function () {
     Route::post('/users/{userId}/toggle-mailbox', [UserController::class, 'toggleMailbox'])->name('users.toggle-mailbox');
     // amazonq-ignore-next-line
     Route::delete('/users/{userId}', [UserController::class, 'destroy'])->name('users.destroy');
+    // amazonq-ignore-next-line
+    Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
 });

@@ -63,6 +63,12 @@
               <p>Users</p>
             </a>
           </li>
+          <li class="nav-item">
+            <a href="{{ route('audit-logs') }}" class="nav-link {{ request()->routeIs('audit-logs') ? 'active' : '' }}">
+              <i class="nav-icon bi bi-journal-text"></i>
+              <p>Audit Log</p>
+            </a>
+          </li>
         </ul>
       </nav>
     </div>
