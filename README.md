@@ -49,6 +49,12 @@ The login flow works as follows:
 | Mailbox management per user | ❌ | ✅ |
 | Database migrations | ✅ | ❌ |
 
+## Roadmap
+
+### Planned
+- [ ] **Nextcloud user management** — provision and manage Nextcloud users per realm
+- [ ] **Temporary Mailcow domain admin** — tenant admin can request a temporary Mailcow domain admin account (random password, shown once) for direct Mailcow access. Account is automatically deleted after 1 hour via the Laravel scheduler. Covers the edge cases that lintune-dash doesn't expose (DKIM, spam filters, aliases, catchalls etc.)
+
 ## Installation
 
 See [docs/install.md](docs/install.md).
