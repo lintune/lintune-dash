@@ -73,7 +73,7 @@ return [
     |
     */
 
-    // amazonq-ignore-next-line
+    
     'links' => [
         public_path('storage') => storage_path('app/public'),
     ],
