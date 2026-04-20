@@ -138,7 +138,7 @@
             <div class="input-group" id="emailCreateGroup">
               <input type="text" name="email" id="fieldEmail" class="form-control" required
                      pattern="[a-zA-Z0-9_.\-]+" />
-              <span class="input-group-text">@{{ $realm }}</span>
+              <span class="input-group-text">{{ '@' . $realm }}</span>
             </div>
             <div id="emailEditGroup" style="display:none">
               <input type="email" name="email" id="fieldEmailEdit" class="form-control" required />

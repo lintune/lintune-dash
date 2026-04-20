@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Mailbox;
 use App\Models\DomainRealmMap;
 use App\Services\AuditLogger;
+use App\Services\MailcowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -211,17 +212,16 @@ class UserController extends Controller
             return back()->withErrors(['user' => 'User has no email address.']);
         }
 
-        $mailcowUrl = rtrim(config('mailcow.url'), '/');
-        $headers    = ['X-API-Key' => config('mailcow.api_key'), 'Accept' => 'application/json'];
+        $mailcow = new MailcowService($realm);
 
-        if (!$mailcowUrl || !config('mailcow.api_key')) {
-            return back()->withErrors(['user' => 'Mailcow is not configured on this server.']);
+        if (!$mailcow->isConfigured()) {
+            return back()->withErrors(['user' => 'Mailcow is not configured for this realm.']);
         }
-        $mailbox    = Mailbox::where('email', $email)->first();
+
+        $mailbox = Mailbox::where('email', $email)->first();
 
         if ($mailbox) {
-            // Delete mailbox from Mailcow
-            $res = \Http::withHeaders($headers)->post("{$mailcowUrl}/api/v1/delete/mailbox", [$email]);
+            $res = \Http::withHeaders($mailcow->headers())->post($mailcow->url('delete/mailbox'), [$email]);
             if ($res->failed() || ($res->json()[0]['type'] ?? '') === 'error') {
                 $detail = $res->json()[0]['msg'] ?? $res->body();
                 return back()->withErrors(['user' => "Failed to delete mailbox: {$detail}"]);
@@ -231,15 +231,14 @@ class UserController extends Controller
             return redirect()->route('users')->with('success', "Mailbox {$email} deleted.");
         }
 
-        // Create mailbox in Mailcow
         $password = bin2hex(random_bytes(12));
-        $res = \Http::withHeaders($headers)->post("{$mailcowUrl}/api/v1/add/mailbox", [
-            'local_part'  => Str::before($email, '@'),
-            'domain'      => Str::after($email, '@'),
-            'name'        => trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')),
-            'password'    => $password,
-            'password2'   => $password,
-            'active'      => '1',
+        $res = \Http::withHeaders($mailcow->headers())->post($mailcow->url('add/mailbox'), [
+            'local_part' => \Str::before($email, '@'),
+            'domain'     => \Str::after($email, '@'),
+            'name'       => trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')),
+            'password'   => $password,
+            'password2'  => $password,
+            'active'     => '1',
         ]);
 
         if ($res->failed() || ($res->json()[0]['type'] ?? '') === 'error') {
