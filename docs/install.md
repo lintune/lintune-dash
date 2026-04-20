@@ -31,13 +31,14 @@ Edit `.env` and fill in the required values:
 | Variable | Description |
 |---|---|
 | `APP_URL` | Public URL of this app (e.g. `https://dash.yourdomain.com`) |
+| `APP_KEY` | Must match the `APP_KEY` in lintune-admin — both apps share encrypted values in the database |
 | `DB_HOST` / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | Same MySQL database as lintune-admin |
 | `KEYCLOAK_BASE_URL` | Public URL of your Keycloak instance |
 | `KEYCLOAK_CLIENT_ID` | Keycloak client ID (default: `lintune-frontend`) |
 | `KEYCLOAK_ALLOWED_GROUPS` | Keycloak group required for access (default: `realm-admin`) |
 | `KEYCLOAK_ADMIN_CLI_CLIENT` | Keycloak admin CLI client (default: `admin-cli`) |
-| `MAILCOW_URL` | Mailcow base URL |
-| `MAILCOW_API_KEY` | Mailcow API key |
+
+> **Important:** Do not run `php artisan key:generate` in lintune-dash. Copy the `APP_KEY` from lintune-admin's `.env` instead. Both apps must share the same key to encrypt and decrypt values stored in the shared database.
 
 > **Note:** Database migrations are managed by lintune-admin. Do not run migrations here.
 
