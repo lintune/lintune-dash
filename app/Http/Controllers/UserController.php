@@ -80,25 +80,27 @@ class UserController extends Controller
             ? Mailbox::where('realm', $realm)->pluck('active', 'email')
             : collect();
 
-        return view('users.index', compact('users', 'adminUserIds', 'mailcowEnabled', 'mailboxEmails'));
+        return view('users.index', compact('users', 'adminUserIds', 'mailcowEnabled', 'mailboxEmails', 'realm'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'firstName' => 'required',
-            'lastName'  => 'required',
-            'email'     => 'required|email',
+            'firstName' => 'required|string|max:255',
+            'lastName'  => 'required|string|max:255',
+            'email'     => ['required', 'regex:/^[a-zA-Z0-9_.\-]+$/'],
             'password'  => 'required|min:8',
         ]);
 
         ['base' => $base, 'realm' => $realm, 'token' => $token] = $this->keycloak();
 
+        $email = strtolower(trim($request->email)) . '@' . $realm;
+
         $res = \Http::withToken($token)->post("{$base}/admin/realms/{$realm}/users", [
-            'username'      => $request->email,
-            'email'         => $request->email,
-            'firstName'     => $request->firstName,
-            'lastName'      => $request->lastName,
+            'username'      => $email,
+            'email'         => $email,
+            'firstName'     => trim($request->firstName),
+            'lastName'      => trim($request->lastName),
             'enabled'       => true,
             'emailVerified' => true,
             'credentials'   => [[

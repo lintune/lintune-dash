@@ -52,7 +52,11 @@ The login flow works as follows:
 ## Roadmap
 
 ### Planned
+- [ ] **Group management** — create and manage Keycloak groups per realm, assign users to groups. Groups are mirrored to Nextcloud when enabled, and will be used for workstation login policies and Nextcloud Team Folders
 - [ ] **Nextcloud user management** — provision and manage Nextcloud users per realm
+- [ ] **Mailbox app passwords** — create and revoke per-device app passwords for IMAP/SMTP access via Mailcow. Password is shown once on creation and never stored. Allows users to connect email clients (Thunderbird, Outlook etc.) without using their main account password
+- [ ] **Welcome email on user creation** — send a welcome email when a user is created. If Mailcow is enabled for the realm, sends via the Mailcow API using the tenant's domain. If Mailcow is not enabled, falls back to the MSP sender email configured in lintune-admin's platform settings
+- [ ] **Mailbox quota management** — per-mailbox quota allocation (set individually in lintune-dash, within the domain pool set in lintune-admin). Includes a quota usage overview showing used/allocated per mailbox and total domain pool usage, pulled from the Mailcow API in a single call
 - [ ] **Temporary Mailcow domain admin** — tenant admin can request a temporary Mailcow domain admin account (random password, shown once) for direct Mailcow access. Account is automatically deleted after 1 hour via the Laravel scheduler. Covers the edge cases that lintune-dash doesn't expose (DKIM, spam filters, aliases, catchalls etc.)
 
 ## Installation

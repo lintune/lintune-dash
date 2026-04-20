@@ -135,7 +135,14 @@
           </div>
           <div class="mb-3">
             <label class="form-label">Email</label>
-            <input type="email" name="email" id="fieldEmail" class="form-control" required />
+            <div class="input-group" id="emailCreateGroup">
+              <input type="text" name="email" id="fieldEmail" class="form-control" required
+                     pattern="[a-zA-Z0-9_.\-]+" />
+              <span class="input-group-text">@{{ $realm }}</span>
+            </div>
+            <div id="emailEditGroup" style="display:none">
+              <input type="email" name="email" id="fieldEmailEdit" class="form-control" required />
+            </div>
             <small class="text-muted" id="emailHint"></small>
           </div>
           <div class="mb-3" id="usernameRow" style="display:none">
@@ -222,6 +229,7 @@ document.getElementById('userModal').addEventListener('show.bs.modal', function 
   document.getElementById('fieldFirstName').value = '';
   document.getElementById('fieldLastName').value  = '';
   document.getElementById('fieldEmail').value     = '';
+  document.getElementById('fieldEmailEdit').value = '';
   document.getElementById('fieldUsername').value  = '';
   pwdField.value = '';
   document.getElementById('fieldIsAdmin').checked = false;
@@ -232,7 +240,11 @@ document.getElementById('userModal').addEventListener('show.bs.modal', function 
     this.querySelector('.modal-title').textContent = 'New User';
     pwdField.required = true;
     hint.textContent  = 'Required.';
-    document.getElementById('emailHint').textContent = 'This will also be the username and cannot be changed later.';
+    document.getElementById('emailHint').textContent = 'Username will be the full email address and cannot be changed later.';
+    document.getElementById('emailCreateGroup').style.display = '';
+    document.getElementById('emailEditGroup').style.display   = 'none';
+    document.getElementById('fieldEmail').name     = 'email';
+    document.getElementById('fieldEmailEdit').name = '';
     document.getElementById('usernameRow').style.display = 'none';
     document.getElementById('userSubmitBtn').textContent = 'Create User';
     pwdField.value = generatePassword();
@@ -243,10 +255,14 @@ document.getElementById('userModal').addEventListener('show.bs.modal', function 
     this.querySelector('.modal-title').textContent = 'Edit User';
     document.getElementById('fieldFirstName').value = btn.dataset.firstname;
     document.getElementById('fieldLastName').value  = btn.dataset.lastname;
-    document.getElementById('fieldEmail').value     = btn.dataset.email;
+    document.getElementById('fieldEmailEdit').value = btn.dataset.email;
     document.getElementById('fieldUsername').value  = btn.dataset.username;
     document.getElementById('fieldIsAdmin').checked = btn.dataset.admin === '1';
     document.getElementById('emailHint').textContent = '';
+    document.getElementById('emailCreateGroup').style.display = 'none';
+    document.getElementById('emailEditGroup').style.display   = '';
+    document.getElementById('fieldEmail').name     = '';
+    document.getElementById('fieldEmailEdit').name = 'email';
     document.getElementById('usernameRow').style.display = '';
     pwdField.required = false;
     hint.textContent  = 'Leave blank to keep current password.';
