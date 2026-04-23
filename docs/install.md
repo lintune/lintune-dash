@@ -8,6 +8,7 @@
 - MySQL database (shared with lintune-admin)
 - Keycloak instance
 - Mailcow instance (optional)
+- Nextcloud instance (optional)
 
 ## Steps
 
@@ -23,7 +24,6 @@ composer install --no-dev --optimize-autoloader
 
 ```bash
 cp .env.example .env
-php artisan key:generate
 ```
 
 Edit `.env` and fill in the required values:

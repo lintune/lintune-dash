@@ -24,8 +24,3 @@ php artisan view:cache
 > If you skip the cache clear after a pull, you may see errors like `Route [x] not defined` even though the route exists in code. Always clear before rebuilding.
 
 > Database migrations are managed by lintune-admin. Do not run migrations here.
-
-## Frontend assets
-
-Compiled assets are committed to the repository. npm is not needed on the server.
-Only run `npm install && npm run build` locally when making frontend changes, then commit the compiled output.

@@ -39,12 +39,7 @@ KEYCLOAK_ALLOWED_GROUPS=realm-admin
 php artisan migrate
 ```
 
-Insert domain-to-realm mapping for each tenant:
 
-```sql
-INSERT INTO domain_realm_map (domain, realm, created_at, updated_at)
-VALUES ('yourdomain.nl', 'your-realm', NOW(), NOW());
-```
 
 ## Apache virtual host
 
@@ -71,10 +66,3 @@ sudo systemctl restart apache2
 ```bash
 sudo chown -R www-data:www-data storage bootstrap/cache
 ```
-
-## Keycloak client setup
-
-1. Create a realm per tenant
-2. Create client `lintune-frontend` — type `public`, enable PKCE (`S256`)
-3. Add `https://yourdomain.com/auth/callback` as a valid redirect URI
-4. Ensure the user has the `realm-admin` role under `realm-management` resource roles
