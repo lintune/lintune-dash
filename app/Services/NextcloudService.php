@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\RealmConfig;
 use App\Models\Setting;
 
 class NextcloudService
@@ -10,11 +11,16 @@ class NextcloudService
     private string $user;
     private string $password;
 
-    public function __construct()
+    public function __construct(?string $realm = null)
     {
-        $this->baseUrl  = rtrim(Setting::get('nextcloud.url', ''), '/');
-        $this->user     = Setting::get('nextcloud.service_user', '');
-        $this->password = Setting::get('nextcloud.service_password', '');
+        $this->baseUrl  = rtrim(
+            ($realm ? RealmConfig::get($realm, 'nextcloud.url') : null) ?? Setting::get('nextcloud.url', ''),
+            '/'
+        );
+        $this->user     = ($realm ? RealmConfig::get($realm, 'nextcloud.service_user') : null)
+            ?? Setting::get('nextcloud.service_user', '');
+        $this->password = ($realm ? RealmConfig::get($realm, 'nextcloud.service_password') : null)
+            ?? Setting::get('nextcloud.service_password', '');
     }
 
     public function isConfigured(): bool

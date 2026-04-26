@@ -26,6 +26,7 @@ Route::middleware(RequireAuth::class)->group(function () {
     Route::put('/users/{userId}', [UserController::class, 'update'])->name('users.update');
     Route::post('/users/{userId}/toggle', [UserController::class, 'toggle'])->name('users.toggle');
     Route::post('/users/{userId}/toggle-mailbox', [UserController::class, 'toggleMailbox'])->name('users.toggle-mailbox');
+    Route::post('/users/{userId}/toggle-nextcloud', [UserController::class, 'toggleNextcloud'])->name('users.toggle-nextcloud');
     Route::delete('/users/{userId}', [UserController::class, 'destroy'])->name('users.destroy');
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
 });

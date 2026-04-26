@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Mailbox;
+use App\Models\NextcloudUser;
 use App\Models\DomainRealmMap;
 use App\Services\AuditLogger;
 use App\Services\MailcowService;
@@ -76,12 +77,29 @@ class UserController extends Controller
             $adminUserIds = [];
         }
 
-        $mailcowEnabled = DomainRealmMap::where('realm', $realm)->value('mailcow_enabled') ?? false;
-        $mailboxEmails  = $mailcowEnabled
+        $mailcowEnabled   = DomainRealmMap::where('realm', $realm)->value('mailcow_enabled') ?? false;
+        $nextcloudEnabled = DomainRealmMap::where('realm', $realm)->value('nextcloud_enabled') ?? false;
+        $map              = DomainRealmMap::where('realm', $realm)->first();
+        $mailboxEmails    = $mailcowEnabled
             ? Mailbox::where('realm', $realm)->pluck('active', 'email')
             : collect();
 
-        return view('users.index', compact('users', 'adminUserIds', 'mailcowEnabled', 'mailboxEmails', 'realm'));
+        $ncUserIds = [];
+        if ($nextcloudEnabled) {
+            $ncUserIds = NextcloudUser::where('realm', $realm)->pluck('username')->all();
+            $ncUserIds = array_flip($ncUserIds);
+        }
+
+        $counts = [
+            'users'     => count($users ?? []),
+            'max_users' => $map?->max_users,
+            'mailboxes'     => $mailcowEnabled ? Mailbox::where('realm', $realm)->count() : null,
+            'max_mailboxes' => $map?->max_mailbox_users,
+            'nextcloud'     => $nextcloudEnabled ? NextcloudUser::where('realm', $realm)->count() : null,
+            'max_nextcloud' => $map?->max_nextcloud_users,
+        ];
+
+        return view('users.index', compact('users', 'adminUserIds', 'mailcowEnabled', 'nextcloudEnabled', 'mailboxEmails', 'ncUserIds', 'realm', 'counts'));
     }
 
     public function store(Request $request)
@@ -96,6 +114,15 @@ class UserController extends Controller
         ['base' => $base, 'realm' => $realm, 'token' => $token] = $this->keycloak();
 
         $email = strtolower(trim($request->email)) . '@' . $realm;
+
+        // Enforce max_users limit
+        $map = DomainRealmMap::where('realm', $realm)->first();
+        if ($map?->max_users) {
+            $count = count(\Http::withToken($token)->get("{$base}/admin/realms/{$realm}/users", ['max' => 1000])->json() ?? []);
+            if ($count >= $map->max_users) {
+                return back()->withErrors(['user' => "User limit reached ({$map->max_users} users maximum)."]);
+            }
+        }
 
         $res = \Http::withToken($token)->post("{$base}/admin/realms/{$realm}/users", [
             'username'      => $email,
@@ -231,6 +258,15 @@ class UserController extends Controller
             return redirect()->route('users')->with('success', "Mailbox {$email} deleted.");
         }
 
+        // Enforce max_mailbox_users limit
+        $map = DomainRealmMap::where('realm', $realm)->first();
+        if ($map?->max_mailbox_users) {
+            $mailboxCount = Mailbox::where('realm', $realm)->count();
+            if ($mailboxCount >= $map->max_mailbox_users) {
+                return back()->withErrors(['user' => "Mailbox limit reached ({$map->max_mailbox_users} mailboxes maximum)."]);
+            }
+        }
+
         $password = bin2hex(random_bytes(12));
         $res = \Http::withHeaders($mailcow->headers())->post($mailcow->url('add/mailbox'), [
             'local_part' => \Str::before($email, '@'),
@@ -251,6 +287,64 @@ class UserController extends Controller
         return redirect()->route('users')->with('success', "Mailbox {$email} created.");
     }
 
+    public function toggleNextcloud(string $userId)
+    {
+        ['base' => $base, 'realm' => $realm, 'token' => $token] = $this->keycloak();
+
+        $user  = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/users/{$userId}")->json();
+        $email = $user['email'] ?? null;
+
+        if (!$email) {
+            return back()->withErrors(['user' => 'User has no email address.']);
+        }
+
+        $nc = new \App\Services\NextcloudService($realm);
+        if (!$nc->isConfigured()) {
+            return back()->withErrors(['user' => 'Nextcloud is not configured for this realm.']);
+        }
+
+        // Check if user already exists in Nextcloud
+        $check = $nc->get("cloud/users/{$email}");
+        $exists = ($check->json()['ocs']['meta']['statuscode'] ?? 0) === 100;
+
+        if ($exists) {
+            $res = $nc->delete("cloud/users/{$email}");
+            if (($res->json()['ocs']['meta']['statuscode'] ?? 0) !== 100) {
+                return back()->withErrors(['user' => 'Failed to remove Nextcloud user.']);
+            }
+            NextcloudUser::where('realm', $realm)->where('username', $email)->delete();
+            AuditLogger::log('nextcloud_user.deleted', $email);
+            return redirect()->route('users')->with('success', "Nextcloud access removed for {$email}.");
+        }
+
+        // Enforce max_nextcloud_users
+        $map = DomainRealmMap::where('realm', $realm)->first();
+        if ($map?->max_nextcloud_users) {
+            $ncCount = NextcloudUser::where('realm', $realm)->count();
+            if ($ncCount >= $map->max_nextcloud_users) {
+                return back()->withErrors(['user' => "Nextcloud user limit reached ({$map->max_nextcloud_users} maximum)."]);
+            }
+        }
+
+        $quota = \App\Models\Setting::get('nextcloud.default_quota', 10);
+        $res = $nc->post('cloud/users', [
+            'userid'      => $email,
+            'displayName' => trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')),
+            'email'       => $email,
+            'quota'       => (string) round($quota * 1073741824),
+            'groups'      => [$realm],
+        ]);
+
+        if (($res->json()['ocs']['meta']['statuscode'] ?? 0) !== 100) {
+            $msg = $res->json()['ocs']['meta']['message'] ?? $res->body();
+            return back()->withErrors(['user' => "Failed to create Nextcloud user: {$msg}"]);
+        }
+
+        NextcloudUser::create(['realm' => $realm, 'username' => $email]);
+        AuditLogger::log('nextcloud_user.created', $email);
+        return redirect()->route('users')->with('success', "Nextcloud access enabled for {$email}.");
+    }
+
     public function destroy(string $userId)
     {
         ['base' => $base, 'realm' => $realm, 'token' => $token] = $this->keycloak();
@@ -259,13 +353,38 @@ class UserController extends Controller
             return redirect()->route('users')->withErrors(['user' => 'Cannot delete the last realm admin.']);
         }
 
+        $user  = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/users/{$userId}")->json();
+        $email = $user['email'] ?? null;
+
         $res = \Http::withToken($token)->delete("{$base}/admin/realms/{$realm}/users/{$userId}");
 
         if ($res->failed()) {
             return back()->withErrors(['user' => 'Failed to delete user.']);
         }
 
-        AuditLogger::log('user.deleted', $userId);
+        // Clean up mailbox
+        if ($email) {
+            $mailbox = Mailbox::where('email', $email)->first();
+            if ($mailbox) {
+                $mailcow = new \App\Services\MailcowService($realm);
+                if ($mailcow->isConfigured()) {
+                    \Http::withHeaders($mailcow->headers())->post($mailcow->url('delete/mailbox'), [$email]);
+                }
+                $mailbox->delete();
+            }
+        }
+
+        // Clean up Nextcloud
+        $ncUser = NextcloudUser::where('realm', $realm)->where('username', $email)->first();
+        if ($ncUser) {
+            $nc = new \App\Services\NextcloudService($realm);
+            if ($nc->isConfigured()) {
+                $nc->delete("cloud/users/{$email}");
+            }
+            $ncUser->delete();
+        }
+
+        AuditLogger::log('user.deleted', $email ?? $userId);
         return redirect()->route('users')->with('success', 'User deleted.');
     }
 }

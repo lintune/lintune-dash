@@ -7,6 +7,24 @@
 <div class="card">
   <div class="card-header d-flex align-items-center">
     <h3 class="card-title me-auto">User List</h3>
+    <div class="me-3 d-flex gap-3">
+      <small class="text-muted">
+        <i class="bi bi-people me-1"></i>
+        {{ $counts['users'] }}{{ $counts['max_users'] ? '/'.$counts['max_users'] : '' }} users
+      </small>
+      @if($mailcowEnabled)
+      <small class="text-muted">
+        <i class="bi bi-envelope me-1"></i>
+        {{ $counts['mailboxes'] }}{{ $counts['max_mailboxes'] ? '/'.$counts['max_mailboxes'] : '' }} mailboxes
+      </small>
+      @endif
+      @if($nextcloudEnabled)
+      <small class="text-muted">
+        <i class="bi bi-cloud me-1"></i>
+        {{ $counts['nextcloud'] }}{{ $counts['max_nextcloud'] ? '/'.$counts['max_nextcloud'] : '' }} Nextcloud
+      </small>
+      @endif
+    </div>
     <input type="search" id="search" class="form-control w-auto me-2" placeholder="Search…" />
     <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#userModal" data-mode="create">
       <i class="bi bi-person-plus me-1"></i>New User
@@ -31,17 +49,18 @@
             <th>Name</th>
             <th>Email</th>
             <th>Role</th>
-            <th>Status</th>
+            <th>Active</th>
             @if($mailcowEnabled)<th>Mailbox</th>@endif
+            @if($nextcloudEnabled)<th>Nextcloud</th>@endif
             <th></th>
           </tr>
         </thead>
         <tbody>
           @foreach ($users as $user)
           @php
-            $enabled = $user['enabled'] ?? false;
-            $isAdmin = in_array($user['id'], $adminUserIds);
-            $userEmail = $user['email'] ?? '';
+            $enabled    = $user['enabled'] ?? false;
+            $isAdmin    = in_array($user['id'], $adminUserIds);
+            $userEmail  = $user['email'] ?? '';
             $hasMailbox = $mailcowEnabled && isset($mailboxEmails[$userEmail]);
           @endphp
           <tr>
@@ -55,15 +74,38 @@
               @endif
             </td>
             <td>
-              <span class="badge text-bg-{{ $enabled ? 'success' : 'secondary' }}">
-                {{ $enabled ? 'Active' : 'Disabled' }}
-              </span>
+              <form method="POST" action="{{ route('users.toggle', $user['id']) }}" class="toggle-form">
+                @csrf
+                <div class="form-check form-switch mb-0" style="padding-left:0">
+                  <input type="checkbox" class="form-check-input toggle-switch" role="switch"
+                    {{ $enabled ? 'checked' : '' }} title="{{ $enabled ? 'Disable user' : 'Enable user' }}"
+                    style="margin-left:0;cursor:pointer">
+                </div>
+              </form>
             </td>
             @if($mailcowEnabled)
             <td>
-              <span class="badge text-bg-{{ $hasMailbox ? 'success' : 'secondary' }}">
-                <i class="bi bi-envelope{{ $hasMailbox ? '-check' : '' }} me-1"></i>{{ $hasMailbox ? 'Active' : 'None' }}
-              </span>
+              <form method="POST" action="{{ route('users.toggle-mailbox', $user['id']) }}" class="toggle-form">
+                @csrf
+                <div class="form-check form-switch mb-0" style="padding-left:0">
+                  <input type="checkbox" class="form-check-input toggle-switch" role="switch"
+                    {{ $hasMailbox ? 'checked' : '' }} title="{{ $hasMailbox ? 'Remove mailbox' : 'Create mailbox' }}"
+                    style="margin-left:0;cursor:pointer">
+                </div>
+              </form>
+            </td>
+            @endif
+            @if($nextcloudEnabled)
+            @php $hasNextcloud = isset($ncUserIds[$userEmail]); @endphp
+            <td>
+              <form method="POST" action="{{ route('users.toggle-nextcloud', $user['id']) }}" class="toggle-form">
+                @csrf
+                <div class="form-check form-switch mb-0" style="padding-left:0">
+                  <input type="checkbox" class="form-check-input toggle-switch" role="switch"
+                    {{ $hasNextcloud ? 'checked' : '' }} title="{{ $hasNextcloud ? 'Remove Nextcloud access' : 'Enable Nextcloud access' }}"
+                    style="margin-left:0;cursor:pointer">
+                </div>
+              </form>
             </td>
             @endif
             <td class="text-end pe-3">
@@ -78,28 +120,13 @@
                 data-admin="{{ $isAdmin ? '1' : '0' }}">
                 <i class="bi bi-pencil"></i>
               </button>
-              @if($mailcowEnabled)
-              <form method="POST" action="{{ route('users.toggle-mailbox', $user['id']) }}" class="d-inline">
-                @csrf
-                <button type="submit" class="btn btn-sm {{ $hasMailbox ? 'btn-outline-danger' : 'btn-outline-primary' }} me-1"
-                  title="{{ $hasMailbox ? 'Delete mailbox' : 'Create mailbox' }}">
-                  <i class="bi bi-envelope{{ $hasMailbox ? '-dash' : '-plus' }}"></i>
-                </button>
-              </form>
-              @endif
-              <button type="button" class="btn btn-sm {{ $enabled ? 'btn-warning' : 'btn-success' }} me-1"
-                data-bs-toggle="modal" data-bs-target="#confirmModal"
-                data-action="toggle"
-                data-id="{{ $user['id'] }}"
-                data-name="{{ trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')) ?: $user['email'] }}"
-                data-enabled="{{ $enabled ? '1' : '0' }}">
-                <i class="bi bi-{{ $enabled ? 'pause-circle' : 'play-circle' }}"></i>
-              </button>
               <button type="button" class="btn btn-sm btn-danger"
                 data-bs-toggle="modal" data-bs-target="#confirmModal"
-                data-action="delete"
                 data-id="{{ $user['id'] }}"
-                data-name="{{ trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')) ?: $user['email'] }}">
+                data-name="{{ trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')) ?: $user['email'] }}"
+                data-email="{{ $userEmail }}"
+                data-has-mailbox="{{ $hasMailbox ? '1' : '0' }}"
+                data-has-nextcloud="{{ isset($ncUserIds[$userEmail]) ? '1' : '0' }}">
                 <i class="bi bi-trash"></i>
               </button>
             </td>
@@ -136,12 +163,12 @@
           <div class="mb-3">
             <label class="form-label">Email</label>
             <div class="input-group" id="emailCreateGroup">
-              <input type="text" name="email" id="fieldEmail" class="form-control" required
+              <input type="text" name="email" id="fieldEmail" class="form-control"
                      pattern="[a-zA-Z0-9_.\-]+" />
               <span class="input-group-text">{{ '@' . $realm }}</span>
             </div>
             <div id="emailEditGroup" style="display:none">
-              <input type="email" name="email" id="fieldEmailEdit" class="form-control" required />
+              <input type="email" name="email" id="fieldEmailEdit" class="form-control" />
             </div>
             <small class="text-muted" id="emailHint"></small>
           </div>
@@ -190,7 +217,7 @@
         <form id="confirmForm" method="POST">
           @csrf
           <input type="hidden" name="_method" id="confirmMethod">
-          <button type="submit" class="btn" id="confirmBtn">Confirm</button>
+          <button type="submit" class="btn btn-danger" id="confirmBtn">Yes, delete</button>
         </form>
       </div>
     </div>
@@ -198,6 +225,14 @@
 </div>
 
 <script>
+// Toggle switches — submit parent form on change
+document.querySelectorAll('.toggle-switch').forEach(function (input) {
+  input.addEventListener('change', function () {
+    document.getElementById('loadingOverlay').style.display = 'flex';
+    this.closest('form').submit();
+  });
+});
+
 // Search
 document.getElementById('search')?.addEventListener('input', function () {
   const q = this.value.toLowerCase();
@@ -244,7 +279,9 @@ document.getElementById('userModal').addEventListener('show.bs.modal', function 
     document.getElementById('emailCreateGroup').style.display = '';
     document.getElementById('emailEditGroup').style.display   = 'none';
     document.getElementById('fieldEmail').name     = 'email';
+    document.getElementById('fieldEmail').required = true;
     document.getElementById('fieldEmailEdit').name = '';
+    document.getElementById('fieldEmailEdit').required = false;
     document.getElementById('usernameRow').style.display = 'none';
     document.getElementById('userSubmitBtn').textContent = 'Create User';
     pwdField.value = generatePassword();
@@ -262,7 +299,9 @@ document.getElementById('userModal').addEventListener('show.bs.modal', function 
     document.getElementById('emailCreateGroup').style.display = 'none';
     document.getElementById('emailEditGroup').style.display   = '';
     document.getElementById('fieldEmail').name     = '';
+    document.getElementById('fieldEmail').required = false;
     document.getElementById('fieldEmailEdit').name = 'email';
+    document.getElementById('fieldEmailEdit').required = true;
     document.getElementById('usernameRow').style.display = '';
     pwdField.required = false;
     hint.textContent  = 'Leave blank to keep current password.';
@@ -270,38 +309,36 @@ document.getElementById('userModal').addEventListener('show.bs.modal', function 
   }
 });
 
-// Confirm modal (toggle / delete)
+// Confirm modal (delete only)
 document.getElementById('confirmModal').addEventListener('show.bs.modal', function (e) {
-  const btn    = e.relatedTarget;
-  const action = btn.dataset.action;
-  const id     = btn.dataset.id;
-  const name   = btn.dataset.name;
-  const enabled = btn.dataset.enabled === '1';
+  const btn         = e.relatedTarget;
+  const id          = btn.dataset.id;
+  const name        = btn.dataset.name;
+  const hasMailbox  = btn.dataset.hasMailbox === '1';
+  const hasNextcloud = btn.dataset.hasNextcloud === '1';
+  const form        = document.getElementById('confirmForm');
 
-  const form   = document.getElementById('confirmForm');
-  const method = document.getElementById('confirmMethod');
+  form.action = `/users/${id}`;
+  document.getElementById('confirmMethod').value = 'DELETE';
+  document.getElementById('confirmTitle').textContent = `Delete "${name}"`;
 
-  if (action === 'delete') {
-    form.action   = `/users/${id}`;
-    method.value  = 'DELETE';
-    document.getElementById('confirmTitle').textContent = `Delete "${name}"`;
-    document.getElementById('confirmBody').innerHTML =
-      `<div class="alert alert-danger mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>
-       This will permanently delete the user. This cannot be undone.</div>`;
-    document.getElementById('confirmBtn').className     = 'btn btn-danger';
-    document.getElementById('confirmBtn').textContent   = 'Yes, delete';
-  } else {
-    form.action   = `/users/${id}/toggle`;
-    method.value  = 'POST';
-    const verb    = enabled ? 'Disable' : 'Enable';
-    document.getElementById('confirmTitle').textContent = `${verb} "${name}"`;
-    document.getElementById('confirmBody').innerHTML = enabled
-      ? `<div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>
-         This user will no longer be able to log in.</div>`
-      : `<p class="mb-0">This user will be able to log in again.</p>`;
-    document.getElementById('confirmBtn').className   = `btn btn-${enabled ? 'warning' : 'success'}`;
-    document.getElementById('confirmBtn').textContent = `Yes, ${verb.toLowerCase()}`;
+  let extra = '';
+  if (hasMailbox || hasNextcloud) {
+    const services = [];
+    if (hasMailbox)   services.push('mailbox');
+    if (hasNextcloud) services.push('Nextcloud account');
+    extra = `<div class="alert alert-warning mt-2 mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>
+      This will also delete their ${services.join(' and ')}.</div>`;
   }
+
+  document.getElementById('confirmBody').innerHTML =
+    `<div class="alert alert-danger mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>
+     This will permanently delete the user. This cannot be undone.</div>${extra}`;
 });
 </script>
+<div id="loadingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:1rem">
+  <div class="spinner-border text-light" style="width:3rem;height:3rem"></div>
+  <span class="text-white fw-semibold fs-6">Processing…</span>
+</div>
+
 @endsection
