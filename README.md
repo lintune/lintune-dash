@@ -7,6 +7,7 @@ Lintune Dash is the tenant-facing portal for the Lintune platform — an open-so
 | [Keycloak](https://www.keycloak.org/) | Identity provider — realms, users, SSO |
 | [Mailcow](https://mailcow.email/) | Email server — domains, mailboxes |
 | Nextcloud *(planned)* | File storage & collaboration |
+| Vaultwarden *(planned)* | Password manager — per-tenant organisations |
 
 This repo is the **tenant admin portal**. It is what customers use to manage their own organisation.
 
@@ -58,6 +59,7 @@ The login flow works as follows:
 - [ ] **Welcome email on user creation** — send a welcome email when a user is created. If Mailcow is enabled for the realm, sends via the Mailcow API using the tenant's domain. If Mailcow is not enabled, falls back to the MSP sender email configured in lintune-admin's platform settings
 - [ ] **Mailbox quota management** — per-mailbox quota allocation (set individually in lintune-dash, within the domain pool set in lintune-admin). Includes a quota usage overview showing used/allocated per mailbox and total domain pool usage, pulled from the Mailcow API in a single call
 - [ ] **Temporary Mailcow domain admin** — tenant admin can request a temporary Mailcow domain admin account (random password, shown once) for direct Mailcow access. Account is automatically deleted after 1 hour via the Laravel scheduler. Covers the edge cases that lintune-dash doesn't expose (DKIM, spam filters, aliases, catchalls etc.)
+- [ ] **Vaultwarden** — manage organisation membership and invite users to the tenant’s Vaultwarden organisation. Password shown once on invite, never stored
 - [ ] **Queueing API calls** — Queue any API calls using the Laravel queue worker
 
 
