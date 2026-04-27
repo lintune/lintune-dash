@@ -66,6 +66,14 @@
               <p>Users</p>
             </a>
           </li>
+          @if (session('is_realm_admin'))
+          <li class="nav-item">
+            <a href="{{ route('groups') }}" class="nav-link {{ request()->routeIs('groups*') ? 'active' : '' }}">
+              <i class="nav-icon bi bi-collection"></i>
+              <p>Groups</p>
+            </a>
+          </li>
+          @endif
           <li class="nav-item">
             <a href="{{ route('audit-logs') }}" class="nav-link {{ request()->routeIs('audit-logs') ? 'active' : '' }}">
               <i class="nav-icon bi bi-journal-text"></i>

@@ -34,4 +34,39 @@ class MailcowService
     {
         return !empty($this->baseUrl) && !empty($this->apiKey);
     }
+
+    public function createAlias(string $address, array $gotos): ?int
+    {
+        $res = \Http::withHeaders($this->headers())->post($this->url('add/alias'), [
+            'address' => $address,
+            'goto'    => implode(',', $gotos),
+            'active'  => 1,
+        ]);
+
+        if ($res->failed() || ($res->json()[0]['type'] ?? '') !== 'success') {
+            return null;
+        }
+
+        $all = \Http::withHeaders($this->headers())->get($this->url('get/alias/all'))->json();
+        $alias = collect($all)->firstWhere('address', $address);
+
+        return $alias ? (int) $alias['id'] : null;
+    }
+
+    public function updateAlias(int $aliasId, array $gotos): bool
+    {
+        $res = \Http::withHeaders($this->headers())->post($this->url('edit/alias'), [[
+            'items' => [$aliasId],
+            'attr'  => ['goto' => implode(',', $gotos), 'active' => 1],
+        ]]);
+
+        return ($res->json()[0]['type'] ?? '') === 'success';
+    }
+
+    public function deleteAlias(int $aliasId): bool
+    {
+        $res = \Http::withHeaders($this->headers())->post($this->url('delete/alias'), [$aliasId]);
+
+        return ($res->json()[0]['type'] ?? '') === 'success';
+    }
 }

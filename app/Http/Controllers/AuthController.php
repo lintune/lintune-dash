@@ -90,13 +90,19 @@ class AuthController extends Controller
             return redirect()->route('login.contact');
         }
 
+        $isRealmAdmin = in_array(
+            'realm-admin',
+            $payload['resource_access']['realm-management']['roles'] ?? []
+        );
+
         session([
-            'access_token'  => $tokens['access_token'],
-            'refresh_token' => $tokens['refresh_token'],
-            'id_token'      => $tokens['id_token'],
-            'user_name'     => $payload['name'] ?? $payload['preferred_username'] ?? '',
-            'user_email'    => $payload['email'] ?? '',
-            'realm'         => $realm,
+            'access_token'    => $tokens['access_token'],
+            'refresh_token'   => $tokens['refresh_token'],
+            'id_token'        => $tokens['id_token'],
+            'user_name'       => $payload['name'] ?? $payload['preferred_username'] ?? '',
+            'user_email'      => $payload['email'] ?? '',
+            'realm'           => $realm,
+            'is_realm_admin'  => $isRealmAdmin,
             'token_expires_at' => now()->addSeconds($tokens['expires_in'])->timestamp,
         ]);
 

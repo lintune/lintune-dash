@@ -56,6 +56,37 @@ class NextcloudService
             ->delete($this->url($path));
     }
 
+    public function deleteWithData(string $path, array $data): \Illuminate\Http\Client\Response
+    {
+        return \Http::withBasicAuth($this->user, $this->password)
+            ->withHeaders(['OCS-APIRequest' => 'true', 'Accept' => 'application/json'])
+            ->delete($this->url($path), $data);
+    }
+
+    public function createGroup(string $groupId): bool
+    {
+        $res = $this->post('cloud/groups', ['groupid' => $groupId]);
+        return ($res->json()['ocs']['meta']['statuscode'] ?? 0) === 100;
+    }
+
+    public function deleteGroup(string $groupId): bool
+    {
+        $res = $this->delete("cloud/groups/{$groupId}");
+        return ($res->json()['ocs']['meta']['statuscode'] ?? 0) === 100;
+    }
+
+    public function addGroupMember(string $userId, string $groupId): bool
+    {
+        $res = $this->post("cloud/users/{$userId}/groups", ['groupid' => $groupId]);
+        return ($res->json()['ocs']['meta']['statuscode'] ?? 0) === 100;
+    }
+
+    public function removeGroupMember(string $userId, string $groupId): bool
+    {
+        $res = $this->deleteWithData("cloud/users/{$userId}/groups", ['groupid' => $groupId]);
+        return ($res->json()['ocs']['meta']['statuscode'] ?? 0) === 100;
+    }
+
     private function url(string $path): string
     {
         return $this->baseUrl . '/ocs/v1.php/' . ltrim($path, '/');

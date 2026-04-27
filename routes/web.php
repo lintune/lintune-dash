@@ -3,8 +3,10 @@
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GroupController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\RequireAuth;
+use App\Http\Middleware\RequireRealmAdmin;
 use Illuminate\Support\Facades\Route;
 
 
@@ -29,4 +31,13 @@ Route::middleware(RequireAuth::class)->group(function () {
     Route::post('/users/{userId}/toggle-nextcloud', [UserController::class, 'toggleNextcloud'])->name('users.toggle-nextcloud');
     Route::delete('/users/{userId}', [UserController::class, 'destroy'])->name('users.destroy');
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
+
+    // Groups — realm admins only
+    Route::middleware(RequireRealmAdmin::class)->group(function () {
+        Route::get('/groups', [GroupController::class, 'index'])->name('groups');
+        Route::post('/groups', [GroupController::class, 'store'])->name('groups.store');
+        Route::get('/groups/{id}', [GroupController::class, 'show'])->name('groups.show');
+        Route::put('/groups/{id}/members', [GroupController::class, 'syncMembers'])->name('groups.sync-members');
+        Route::delete('/groups/{id}', [GroupController::class, 'destroy'])->name('groups.destroy');
+    });
 });
