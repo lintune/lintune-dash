@@ -19,6 +19,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        try {
+            $url = \App\Models\Setting::get('keycloak.url');
+            if ($url) {
+                config(['keycloak.base_url' => $url]);
+            }
+        } catch (\Throwable) {
+            // DB not yet migrated — fall back to config.
+        }
     }
 }
