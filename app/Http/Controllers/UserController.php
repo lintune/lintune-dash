@@ -303,16 +303,18 @@ class UserController extends Controller
             return back()->withErrors(['user' => 'Nextcloud is not configured for this realm.']);
         }
 
-        // Check if user already exists in Nextcloud
-        $check = $nc->get("cloud/users/{$email}");
-        $exists = ($check->json()['ocs']['meta']['statuscode'] ?? 0) === 100;
+        // Use the DB record as source of truth for provisioning state, not the NC API.
+        // A user might exist in NC without a DB record (auto-provisioned via OIDC login attempt
+        // before the admin explicitly enabled access). In that case we should treat them as
+        // "not provisioned" and add them to the realm group rather than deleting them.
+        $ncUser = NextcloudUser::where('realm', $realm)->where('username', $email)->first();
 
-        if ($exists) {
+        if ($ncUser) {
             $res = $nc->delete("cloud/users/{$email}");
             if (($res->json()['ocs']['meta']['statuscode'] ?? 0) !== 100) {
                 return back()->withErrors(['user' => 'Failed to remove Nextcloud user.']);
             }
-            NextcloudUser::where('realm', $realm)->where('username', $email)->delete();
+            $ncUser->delete();
             AuditLogger::log('nextcloud_user.deleted', $email);
             return redirect()->route('users')->with('success', "Nextcloud access removed for {$email}.");
         }
@@ -326,18 +328,26 @@ class UserController extends Controller
             }
         }
 
-        $quota = \App\Models\Setting::get('nextcloud.default_quota', 10);
-        $res = $nc->post('cloud/users', [
-            'userid'      => $email,
-            'displayName' => trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')),
-            'email'       => $email,
-            'quota'       => (string) round($quota * 1073741824),
-            'groups'      => [$realm],
-        ]);
+        // Check whether an NC account already exists (e.g. auto-provisioned by OIDC).
+        // If so, just add them to the realm group. If not, create the full account.
+        $alreadyExists = ($nc->get("cloud/users/{$email}")->json()['ocs']['meta']['statuscode'] ?? 0) === 100;
 
-        if (($res->json()['ocs']['meta']['statuscode'] ?? 0) !== 100) {
-            $msg = $res->json()['ocs']['meta']['message'] ?? $res->body();
-            return back()->withErrors(['user' => "Failed to create Nextcloud user: {$msg}"]);
+        if ($alreadyExists) {
+            $nc->post("cloud/users/{$email}/groups", ['groupid' => $realm]);
+        } else {
+            $quota = \App\Models\Setting::get('nextcloud.default_quota', 10);
+            $res = $nc->post('cloud/users', [
+                'userid'      => $email,
+                'displayName' => trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')),
+                'email'       => $email,
+                'quota'       => (string) round($quota * 1073741824),
+                'groups'      => [$realm],
+            ]);
+
+            if (($res->json()['ocs']['meta']['statuscode'] ?? 0) !== 100) {
+                $msg = $res->json()['ocs']['meta']['message'] ?? $res->body();
+                return back()->withErrors(['user' => "Failed to create Nextcloud user: {$msg}"]);
+            }
         }
 
         NextcloudUser::create(['realm' => $realm, 'username' => $email]);
