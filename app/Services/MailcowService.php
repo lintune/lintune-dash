@@ -7,8 +7,8 @@ use App\Models\Setting;
 
 class MailcowService
 {
-    private string $baseUrl;
-    private string $apiKey;
+    private ?string $baseUrl;
+    private ?string $apiKey;
 
     public function __construct(string $realm)
     {

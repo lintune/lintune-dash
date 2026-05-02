@@ -14,8 +14,9 @@ class RealmConfig extends Model
         $record = static::where('realm', $realm)->where('key', $key)->first();
         if (!$record) return $default;
 
-        return $record->encrypted
-            ? decrypt($record->value)
-            : $record->value;
+        if ($record->encrypted) {
+            return $record->value !== null ? decrypt($record->value) : null;
+        }
+        return $record->value;
     }
 }

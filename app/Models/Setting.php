@@ -15,8 +15,9 @@ class Setting extends Model
         $setting = static::find($key);
         if (!$setting) return $default;
 
-        return $setting->encrypted
-            ? decrypt($setting->value)
-            : $setting->value;
+        if ($setting->encrypted) {
+            return $setting->value !== null ? decrypt($setting->value) : null;
+        }
+        return $setting->value;
     }
 }
