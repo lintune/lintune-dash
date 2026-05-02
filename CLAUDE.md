@@ -44,13 +44,21 @@ routes/web.php                 — all routes, protected by RequireAuth; groups 
 - Member picker: option values encoded as `userId|email`, split with `explode('|', $item, 2)`.
 
 ## Services
-- `MailcowService($realm)` — wraps Mailcow API. Methods: `createAlias`, `updateAlias`, `deleteAlias`. Check `isConfigured()` before calling.
+- `MailcowService($realm)` — wraps Mailcow API. Methods: `createAlias`, `updateAlias`, `deleteAlias`. Check `isConfigured()` before calling. `$baseUrl` and `$apiKey` are `?string` — nullable when not configured; `isConfigured()` guards against both being empty.
 - `NextcloudService($realm)` — wraps Nextcloud OCS API. Methods: `createGroup`, `deleteGroup`, `addGroupMember`, `removeGroupMember`. DELETE with body uses `deleteWithData()`.
 
 ## API conventions
 - Always `rtrim($base, '/')` when building Keycloak or Mailcow API URLs.
 - Nextcloud: Basic Auth + `OCS-APIRequest: true` header + `Accept: application/json`.
 - Keycloak user operations use `session('access_token')` (the logged-in user's token, not an admin token).
+
+## Reverse proxy / HTTPS
+- `bootstrap/app.php` sets `$middleware->trustProxies(at: '*')` so that Laravel generates HTTPS URLs correctly when running behind a reverse proxy (nginx/Caddy). Without this, form POSTs redirect to HTTP and CSRF tokens mismatch.
+- `KEYCLOAK_BASE_URL` must be set in `dash.env` to the same URL used in `admin.env`. Without it Keycloak token validation fails with a 500 (null base URL).
+
+## Model notes
+- `Setting::get()` and `RealmConfig::get()` use null-safe decrypt: if `encrypted = true` and `value` is null, they return null instead of calling `decrypt(null)`. This prevents TypeError when a setting exists in the DB but was never populated.
+- `Setting` model lives in both repos (lintune-admin is authoritative for writes; lintune-dash reads only).
 
 ## UI stack
 - Bootstrap 5.3.3 + Bootstrap Icons 1.11.3 + AdminLTE 4.0.0-rc2.
@@ -64,3 +72,5 @@ routes/web.php                 — all routes, protected by RequireAuth; groups 
 - Do not replicate platform-level config — read from shared `settings` table or `DomainRealmMap`.
 - Do not store plaintext credentials or API keys.
 - Do not assume Mailcow or Nextcloud are configured — always check `isConfigured()` / `mailcow_enabled` / `nextcloud_enabled`.
+- Do not call `decrypt()` on a potentially null value — use null-safe pattern: `$value !== null ? decrypt($value) : null`.
+- Do not use strict `string` type hints on service properties that may be null when not configured — use `?string`.
