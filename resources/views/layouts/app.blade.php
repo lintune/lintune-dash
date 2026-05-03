@@ -75,6 +75,12 @@
           </li>
           @endif
           <li class="nav-item">
+            <a href="{{ route('status') }}" class="nav-link {{ request()->routeIs('status') ? 'active' : '' }}">
+              <i class="nav-icon bi bi-activity"></i>
+              <p>Service Status</p>
+            </a>
+          </li>
+          <li class="nav-item">
             <a href="{{ route('audit-logs') }}" class="nav-link {{ request()->routeIs('audit-logs') ? 'active' : '' }}">
               <i class="nav-icon bi bi-journal-text"></i>
               <p>Audit Log</p>

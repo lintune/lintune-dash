@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\StatusController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GroupController;
@@ -23,6 +24,7 @@ Route::get('/session-check', [AuthController::class, 'sessionCheck'])->name('ses
 // Protected
 Route::middleware(RequireAuth::class)->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/status', [StatusController::class, 'index'])->name('status');
     Route::get('/users', [UserController::class, 'index'])->name('users');
     Route::post('/users', [UserController::class, 'store'])->name('users.store');
     Route::put('/users/{userId}', [UserController::class, 'update'])->name('users.update');
