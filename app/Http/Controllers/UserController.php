@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Mailbox;
-use App\Models\NextcloudUser;
 use App\Models\DomainRealmMap;
 use App\Services\AuditLogger;
 use App\Services\MailcowService;
@@ -86,8 +85,14 @@ class UserController extends Controller
 
         $ncUserIds = [];
         if ($nextcloudEnabled) {
-            $ncUserIds = NextcloudUser::where('realm', $realm)->pluck('username')->all();
-            $ncUserIds = array_flip($ncUserIds);
+            try {
+                $ncGroups = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/groups", ['search' => 'nextcloud'])->json();
+                $ncGroup  = collect((array) $ncGroups)->firstWhere('name', 'nextcloud');
+                if ($ncGroup) {
+                    $ncMembers = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/groups/{$ncGroup['id']}/members", ['max' => 1000])->json();
+                    $ncUserIds = collect((array) $ncMembers)->mapWithKeys(fn($u) => [$u['email'] => true])->toArray();
+                }
+            } catch (\Throwable) {}
         }
 
         $counts = [
@@ -95,7 +100,7 @@ class UserController extends Controller
             'max_users' => $map?->max_users,
             'mailboxes'     => $mailcowEnabled ? Mailbox::where('realm', $realm)->count() : null,
             'max_mailboxes' => $map?->max_mailbox_users,
-            'nextcloud'     => $nextcloudEnabled ? NextcloudUser::where('realm', $realm)->count() : null,
+            'nextcloud'     => $nextcloudEnabled ? count($ncUserIds) : null,
             'max_nextcloud' => $map?->max_nextcloud_users,
         ];
 
@@ -298,59 +303,51 @@ class UserController extends Controller
             return back()->withErrors(['user' => 'User has no email address.']);
         }
 
-        $nc = new \App\Services\NextcloudService($realm);
-        if (!$nc->isConfigured()) {
-            return back()->withErrors(['user' => 'Nextcloud is not configured for this realm.']);
+        // Find the nextcloud KC group in the tenant realm
+        $groups  = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/groups", ['search' => 'nextcloud'])->json();
+        $ncGroup = collect((array) $groups)->firstWhere('name', 'nextcloud');
+
+        if (!$ncGroup) {
+            return back()->withErrors(['user' => 'Nextcloud access group not found in this realm.']);
         }
 
-        // Use the DB record as source of truth for provisioning state, not the NC API.
-        // A user might exist in NC without a DB record (auto-provisioned via OIDC login attempt
-        // before the admin explicitly enabled access). In that case we should treat them as
-        // "not provisioned" and add them to the realm group rather than deleting them.
-        $ncUser = NextcloudUser::where('realm', $realm)->where('username', $email)->first();
+        $groupId = $ncGroup['id'];
 
-        if ($ncUser) {
-            $res = $nc->delete("cloud/users/{$email}");
-            if (($res->json()['ocs']['meta']['statuscode'] ?? 0) !== 100) {
-                return back()->withErrors(['user' => 'Failed to remove Nextcloud user.']);
+        // Check current membership in the nextcloud group
+        $userGroups = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/users/{$userId}/groups")->json();
+        $inGroup    = collect((array) $userGroups)->contains('id', $groupId);
+
+        if ($inGroup) {
+            // Remove from KC group and delete NC account for cleanup
+            $res = \Http::withToken($token)->delete("{$base}/admin/realms/{$realm}/users/{$userId}/groups/{$groupId}");
+            if ($res->failed()) {
+                return back()->withErrors(['user' => 'Failed to remove Nextcloud access.']);
             }
-            $ncUser->delete();
+
+            $nc = new \App\Services\NextcloudService($realm);
+            if ($nc->isConfigured()) {
+                $nc->delete("cloud/users/{$email}");
+            }
+
             AuditLogger::log('nextcloud_user.deleted', $email);
             return redirect()->route('users')->with('success', "Nextcloud access removed for {$email}.");
         }
 
-        // Enforce max_nextcloud_users
+        // Enforce max_nextcloud_users against current group member count
         $map = DomainRealmMap::where('realm', $realm)->first();
         if ($map?->max_nextcloud_users) {
-            $ncCount = NextcloudUser::where('realm', $realm)->count();
-            if ($ncCount >= $map->max_nextcloud_users) {
+            $members = \Http::withToken($token)->get("{$base}/admin/realms/{$realm}/groups/{$groupId}/members", ['max' => 1000])->json();
+            if (count((array) $members) >= $map->max_nextcloud_users) {
                 return back()->withErrors(['user' => "Nextcloud user limit reached ({$map->max_nextcloud_users} maximum)."]);
             }
         }
 
-        // Check whether an NC account already exists (e.g. auto-provisioned by OIDC).
-        // If so, just add them to the realm group. If not, create the full account.
-        $alreadyExists = ($nc->get("cloud/users/{$email}")->json()['ocs']['meta']['statuscode'] ?? 0) === 100;
-
-        if ($alreadyExists) {
-            $nc->post("cloud/users/{$email}/groups", ['groupid' => $realm]);
-        } else {
-            $quota = \App\Models\Setting::get('nextcloud.default_quota', 10);
-            $res = $nc->post('cloud/users', [
-                'userid'      => $email,
-                'displayName' => trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')),
-                'email'       => $email,
-                'quota'       => (string) round($quota * 1073741824),
-                'groups'      => [$realm],
-            ]);
-
-            if (($res->json()['ocs']['meta']['statuscode'] ?? 0) !== 100) {
-                $msg = $res->json()['ocs']['meta']['message'] ?? $res->body();
-                return back()->withErrors(['user' => "Failed to create Nextcloud user: {$msg}"]);
-            }
+        // Add to KC group — NC account is auto-provisioned by user_oidc on first login
+        $res = \Http::withToken($token)->put("{$base}/admin/realms/{$realm}/users/{$userId}/groups/{$groupId}");
+        if ($res->failed()) {
+            return back()->withErrors(['user' => 'Failed to grant Nextcloud access.']);
         }
 
-        NextcloudUser::create(['realm' => $realm, 'username' => $email]);
         AuditLogger::log('nextcloud_user.created', $email);
         return redirect()->route('users')->with('success', "Nextcloud access enabled for {$email}.");
     }
@@ -384,14 +381,12 @@ class UserController extends Controller
             }
         }
 
-        // Clean up Nextcloud
-        $ncUser = NextcloudUser::where('realm', $realm)->where('username', $email)->first();
-        if ($ncUser) {
+        // Clean up Nextcloud account (best-effort)
+        if ($email) {
             $nc = new \App\Services\NextcloudService($realm);
             if ($nc->isConfigured()) {
                 $nc->delete("cloud/users/{$email}");
             }
-            $ncUser->delete();
         }
 
         AuditLogger::log('user.deleted', $email ?? $userId);

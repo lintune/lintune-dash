@@ -37,6 +37,7 @@ routes/web.php                 — all routes, protected by RequireAuth; groups 
 - `Group` — local record of groups (mailing_list or security type), with `mailcow_alias_id`, `keycloak_id`, `nextcloud_id`.
 - `GroupMember` — pivot: `group_id`, `user_id` (Keycloak UUID), `email`.
 - `Mailbox` — local record of mailboxes belonging to this realm.
+- `NextcloudUser` — **no longer used by UserController**. NC access state is derived from KC group membership, not this table.
 
 ## Group types
 - **Mailing list** — backed by a Mailcow alias. Members must have an active mailbox. Alias is lazy-created on first member add, deleted when all members removed.
