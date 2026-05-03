@@ -67,6 +67,23 @@ routes/web.php                 — all routes, protected by RequireAuth; groups 
 - Spinner overlay exists in `users/index.blade.php` — replicate this pattern (`#loadingOverlay`, shown on form submit) in other pages that need it.
 - Use `&#64;` as the HTML entity for `@` when mixing Blade and email addresses in templates (e.g. `&#64;{{ session('realm') }}`).
 
+## Nextcloud access control
+
+NC access is gated by membership in the `nextcloud` KC group in the tenant realm. The source of truth is KC, not the `nextcloud_users` DB table.
+
+**`UserController::toggleNextcloud($userId)`:**
+- Fetches the `nextcloud` group from KC (`GET /admin/realms/{realm}/groups?search=nextcloud`).
+- Checks if the user is in the group (`GET /admin/realms/{realm}/users/{userId}/groups`).
+- Enable → `PUT /admin/realms/{realm}/users/{userId}/groups/{groupId}`. No NC OCS provisioning. NC auto-provisions the account on first login via user_oidc.
+- Disable → `DELETE /admin/realms/{realm}/users/{userId}/groups/{groupId}` + `DELETE ocs/v1.php/cloud/users/{email}` (clean up NC account).
+
+**`UserController::index()`:**
+- `$ncUserIds` is built from KC group members: `GET /admin/realms/{realm}/groups/{id}/members`. Keyed by email → `true`. Fallback to `[]` on error.
+- `$counts['nextcloud']` = `count($ncUserIds)` (KC group member count, not DB count).
+
+**`UserController::destroy($userId)`:**
+- Deletes the NC account via `NextcloudService::delete("cloud/users/{email}")` unconditionally (best-effort). No `NextcloudUser` DB interaction.
+
 ## What NOT to do
 - Do not create migration files.
 - Do not allow access to data outside `session('realm')`.
@@ -75,3 +92,4 @@ routes/web.php                 — all routes, protected by RequireAuth; groups 
 - Do not assume Mailcow or Nextcloud are configured — always check `isConfigured()` / `mailcow_enabled` / `nextcloud_enabled`.
 - Do not call `decrypt()` on a potentially null value — use null-safe pattern: `$value !== null ? decrypt($value) : null`.
 - Do not use strict `string` type hints on service properties that may be null when not configured — use `?string`.
+- Do not use the `NextcloudUser` model to track NC access state — use KC group membership instead.
