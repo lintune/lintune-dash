@@ -2,50 +2,28 @@
 
 namespace App\Services;
 
-use PDO;
+use App\Models\Setting;
+use Illuminate\Support\Facades\Http;
 
 class KumaService
 {
-    private function connect(): PDO
+    private string $baseUrl;
+    private string $apiKey;
+
+    public function __construct()
     {
-        $pdo = new PDO(
-            sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
-                env('KUMA_DB_HOST', 'db'),
-                env('KUMA_DB_PORT', '3306'),
-                env('KUMA_DB_NAME', 'kuma')
-            ),
-            env('KUMA_DB_USERNAME', 'lintune'),
-            env('KUMA_DB_PASSWORD', '')
-        );
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        return $pdo;
+        $this->baseUrl = rtrim(env('KUMA_INTERNAL_URL', 'http://uptime-kuma:3001'), '/');
+        $this->apiKey  = Setting::get('kuma.api_key', '');
     }
 
-    // Returns [{id, name, status, url, admin_only}]
-    // status: 0=down, 1=up, 2=pending/unknown, 3=maintenance
-    // admin_only: true for monitors whose name contains "aio"
     public function getStatus(): array
     {
         try {
-            $pdo = $this->connect();
-            $rows = $pdo->query("
-                SELECT m.id, m.name, m.url,
-                    COALESCE(h.status, 2) AS status
-                FROM monitor m
-                LEFT JOIN heartbeat h ON h.id = (
-                    SELECT MAX(id) FROM heartbeat WHERE monitor_id = m.id
-                )
-                WHERE m.active = 1
-                ORDER BY m.id
-            ")->fetchAll(PDO::FETCH_ASSOC);
+            $response = Http::withHeaders([
+                'Authorization' => 'Basic ' . base64_encode('api:' . $this->apiKey),
+            ])->timeout(10)->get($this->baseUrl . '/api/lintune/monitors');
 
-            return array_map(fn($row) => [
-                'id'         => (int) $row['id'],
-                'name'       => $row['name'],
-                'status'     => (int) $row['status'],
-                'url'        => $row['url'] ?? '',
-                'admin_only' => str_contains(strtolower($row['name'] ?? ''), 'aio'),
-            ], $rows);
+            return $response->successful() ? ($response->json() ?? []) : [];
         } catch (\Throwable) {
             return [];
         }
