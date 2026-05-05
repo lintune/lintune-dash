@@ -47,6 +47,7 @@ routes/web.php                 — all routes, protected by RequireAuth; groups 
 ## Services
 - `MailcowService($realm)` — wraps Mailcow API. Methods: `createAlias`, `updateAlias`, `deleteAlias`. Check `isConfigured()` before calling. `$baseUrl` and `$apiKey` are `?string` — nullable when not configured; `isConfigured()` guards against both being empty.
 - `NextcloudService($realm)` — wraps Nextcloud OCS API. Methods: `createGroup`, `deleteGroup`, `addGroupMember`, `removeGroupMember`. DELETE with body uses `deleteWithData()`.
+- `KumaService` — calls `GET /api/lintune/monitors` on the uptime-kuma fork via Laravel Http facade. API key read from `Setting::get('kuma.api_key', '')` (encrypted in shared `settings` table). Only exposes `getStatus(): array`. Used by the dashboard to show service health dots.
 
 ## API conventions
 - Always `rtrim($base, '/')` when building Keycloak or Mailcow API URLs.
