@@ -6,11 +6,19 @@ use PDO;
 
 class KumaService
 {
-    private string $dbPath;
-
-    public function __construct()
+    private function connect(): PDO
     {
-        $this->dbPath = env('KUMA_DB_PATH', '/opt/kuma_data/kuma.db');
+        $pdo = new PDO(
+            sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
+                env('KUMA_DB_HOST', 'db'),
+                env('KUMA_DB_PORT', '3306'),
+                env('KUMA_DB_NAME', 'kuma')
+            ),
+            env('KUMA_DB_USERNAME', 'lintune'),
+            env('KUMA_DB_PASSWORD', '')
+        );
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        return $pdo;
     }
 
     // Returns [{id, name, status, url, admin_only}]
@@ -18,14 +26,8 @@ class KumaService
     // admin_only: true for monitors whose name contains "aio"
     public function getStatus(): array
     {
-        if (!file_exists($this->dbPath)) {
-            return [];
-        }
         try {
-            $pdo = new PDO('sqlite:' . $this->dbPath);
-            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $pdo->exec('PRAGMA busy_timeout=3000;');
-
+            $pdo = $this->connect();
             $rows = $pdo->query("
                 SELECT m.id, m.name, m.url,
                     COALESCE(h.status, 2) AS status
