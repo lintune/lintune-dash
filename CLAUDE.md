@@ -9,9 +9,10 @@ Each login session is scoped to a single realm — never cross-realm.
 app/Http/Controllers/         — AuthController, DashboardController, UserController, GroupController, AuditLogController
 app/Http/Middleware/           — RequireAuth, RequireRealmAdmin
 app/Models/                   — DomainRealmMap, Group, GroupMember, Mailbox, NextcloudUser
-app/Services/                 — AuditLogger, MailcowService, NextcloudService
+app/Services/                 — AuditLogger, KumaService, MailcowService, NextcloudService
 resources/views/               — layouts/app.blade.php, dashboard, users/, groups/, auth/
 routes/web.php                 — all routes, protected by RequireAuth; groups also require RequireRealmAdmin
+docker/                        — Dockerfile, nginx.conf, entrypoint.sh for the container image
 ```
 
 ## Architecture rules
