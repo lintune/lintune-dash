@@ -63,6 +63,31 @@ class NextcloudService
             ->delete($this->url($path), $data);
     }
 
+    public function createUser(string $userId, string $displayName): bool
+    {
+        // Generate a random password; the user authenticates via OIDC so this is never used.
+        $res = $this->post('cloud/users', [
+            'userid'      => $userId,
+            'displayName' => $displayName,
+            'password'    => bin2hex(random_bytes(24)),
+        ]);
+        $code = $res->json()['ocs']['meta']['statuscode'] ?? 0;
+        // 102 = user already exists — treat as success so toggle is idempotent.
+        return $code === 100 || $code === 102;
+    }
+
+    public function userExists(string $userId): bool
+    {
+        $res = $this->get("cloud/users/{$userId}");
+        return ($res->json()['ocs']['meta']['statuscode'] ?? 0) === 100;
+    }
+
+    public function deleteUser(string $userId): bool
+    {
+        $res = $this->delete("cloud/users/{$userId}");
+        return ($res->json()['ocs']['meta']['statuscode'] ?? 0) === 100;
+    }
+
     public function createGroup(string $groupId): bool
     {
         $res = $this->post('cloud/groups', ['groupid' => $groupId]);

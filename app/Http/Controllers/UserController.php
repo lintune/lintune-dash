@@ -326,7 +326,7 @@ class UserController extends Controller
 
             $nc = new \App\Services\NextcloudService($realm);
             if ($nc->isConfigured()) {
-                $nc->delete("cloud/users/{$email}");
+                $nc->deleteUser($email);
             }
 
             AuditLogger::log('nextcloud_user.deleted', $email);
@@ -342,10 +342,18 @@ class UserController extends Controller
             }
         }
 
-        // Add to KC group — NC account is auto-provisioned by user_oidc on first login
+        // Add to KC group (access control) + pre-provision NC account immediately.
+        // Pre-provisioning means the account exists before first login, so quotas and
+        // groups can be managed server-side without waiting for the user to authenticate.
         $res = \Http::withToken($token)->put("{$base}/admin/realms/{$realm}/users/{$userId}/groups/{$groupId}");
         if ($res->failed()) {
             return back()->withErrors(['user' => 'Failed to grant Nextcloud access.']);
+        }
+
+        $nc          = new \App\Services\NextcloudService($realm);
+        $displayName = trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')) ?: $email;
+        if ($nc->isConfigured()) {
+            $nc->createUser($email, $displayName);
         }
 
         AuditLogger::log('nextcloud_user.created', $email);
@@ -385,7 +393,7 @@ class UserController extends Controller
         if ($email) {
             $nc = new \App\Services\NextcloudService($realm);
             if ($nc->isConfigured()) {
-                $nc->delete("cloud/users/{$email}");
+                $nc->deleteUser($email);
             }
         }
 

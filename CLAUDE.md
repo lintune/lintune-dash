@@ -76,8 +76,8 @@ NC access is gated by membership in the `nextcloud` KC group in the tenant realm
 **`UserController::toggleNextcloud($userId)`:**
 - Fetches the `nextcloud` group from KC (`GET /admin/realms/{realm}/groups?search=nextcloud`).
 - Checks if the user is in the group (`GET /admin/realms/{realm}/users/{userId}/groups`).
-- Enable → `PUT /admin/realms/{realm}/users/{userId}/groups/{groupId}`. No NC OCS provisioning. NC auto-provisions the account on first login via user_oidc.
-- Disable → `DELETE /admin/realms/{realm}/users/{userId}/groups/{groupId}` + `DELETE ocs/v1.php/cloud/users/{email}` (clean up NC account).
+- Enable → `PUT /admin/realms/{realm}/users/{userId}/groups/{groupId}` (add to KC group) + `NextcloudService::createUser($email, $displayName)` (pre-provision NC account via OCS). NC account uses email as the NC user ID (matching user_oidc's `--mapping-uid=email`).
+- Disable → `DELETE /admin/realms/{realm}/users/{userId}/groups/{groupId}` + `NextcloudService::deleteUser($email)` (delete NC account). The broker realm `nextcloud-user` role is revoked on the user's next login via the `oidc-role-idp-mapper` with `syncMode=FORCE`.
 
 **`UserController::index()`:**
 - `$ncUserIds` is built from KC group members: `GET /admin/realms/{realm}/groups/{id}/members`. Keyed by email → `true`. Fallback to `[]` on error.
@@ -95,3 +95,4 @@ NC access is gated by membership in the `nextcloud` KC group in the tenant realm
 - Do not call `decrypt()` on a potentially null value — use null-safe pattern: `$value !== null ? decrypt($value) : null`.
 - Do not use strict `string` type hints on service properties that may be null when not configured — use `?string`.
 - Do not use the `NextcloudUser` model to track NC access state — use KC group membership instead.
+- Do not use `$nc->delete("cloud/users/{$email}")` directly — use `$nc->deleteUser($email)` instead.
