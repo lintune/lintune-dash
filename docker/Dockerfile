@@ -11,7 +11,7 @@ RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interactio
 
 # Stage 2: Runtime
 FROM php:8.4-fpm-alpine
-LABEL org.opencontainers.image.source https://github.com/lintune/lintune-dash
+LABEL org.opencontainers.image.source=https://github.com/lintune/lintune-dash
 
 WORKDIR /var/www/html/lintune-dash
 
