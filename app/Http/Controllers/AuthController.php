@@ -11,7 +11,7 @@ class AuthController extends Controller
     public function showLogin()
     {
         if (session('access_token')) {
-            return redirect()->route('dashboard');
+            return redirect('/dash');
         }
         return view('auth.login');
     }
@@ -106,7 +106,7 @@ class AuthController extends Controller
             'token_expires_at' => now()->addSeconds($tokens['expires_in'])->timestamp,
         ]);
 
-        return redirect()->route('dashboard');
+        return redirect('/dash');
     }
 
     public function logout()

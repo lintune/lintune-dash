@@ -11,7 +11,7 @@ use App\Http\Middleware\RequireRealmAdmin;
 use Illuminate\Support\Facades\Route;
 
 
-Route::get('/', fn() => redirect()->route('login'));
+Route::get('/', fn() => session('access_token') ? redirect('/dash') : redirect()->route('login'));
 
 // Auth
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
